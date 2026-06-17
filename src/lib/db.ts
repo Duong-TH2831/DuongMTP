@@ -321,6 +321,7 @@ const COUPONS: Coupon[] = [
 ];
 
 const USERS: User[] = [
+  { id: 'usr-admin-0', name: 'Admin Dương', email: 'duong@gmail.com', role: 'ADMIN', avatar: '/avatars/admin-1.jpg', phone: '0900000000', isActive: true, password: '123456', createdAt: '2025-01-01T00:00:00.000Z' },
   { id: 'usr-admin-1', name: 'Nguyễn Minh Trí', email: 'tri.nguyen@horizon.vn', role: 'ADMIN', avatar: '/avatars/admin-1.jpg', phone: '0901234567', isActive: true, password: '123456', createdAt: '2025-01-01T00:00:00.000Z' },
   { id: 'usr-admin-2', name: 'Phạm Hồng Vân', email: 'van.pham@horizon.vn', role: 'ADMIN', avatar: '/avatars/admin-2.jpg', phone: '0912345678', isActive: true, password: '123456', createdAt: '2025-01-02T00:00:00.000Z' },
   { id: 'usr-staff-1', name: 'Trần Thanh Sơn', email: 'son.tran@horizon.vn', role: 'STAFF', avatar: '/avatars/staff-1.jpg', phone: '0987654321', isActive: true, password: '123456', createdAt: '2025-02-10T00:00:00.000Z' },

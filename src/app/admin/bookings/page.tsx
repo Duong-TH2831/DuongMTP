@@ -261,9 +261,14 @@ export default function BookingList() {
                       <td className="py-4">
                         <div className="flex flex-col">
                           <span className="font-bold text-gold">{b.totalPrice.toLocaleString('vi-VN')}đ</span>
-                          <span className={`text-[9px] font-bold ${b.paymentStatus === 'PAID' ? 'text-emerald-450' : 'text-red-400'} mt-0.5`}>
-                            {b.paymentStatus === 'PAID' ? 'Đã thu tiền' : 'Chưa thanh toán'}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[9px] font-bold ${b.paymentStatus === 'PAID' ? 'text-emerald-450' : 'text-red-400'}`}>
+                              {b.paymentStatus === 'PAID' ? 'Đã thu tiền' : 'Chưa thanh toán'}
+                            </span>
+                            {b.paymentMethod === 'VNPAY' && (
+                              <span className="px-1.5 py-0.5 bg-[#005BAA]/20 text-[#00AEEF] border border-[#005BAA]/30 rounded text-[8px] font-bold">VNPay</span>
+                            )}
+                          </div>
                         </div>
                       </td>
 

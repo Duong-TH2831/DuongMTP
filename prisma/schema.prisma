@@ -39,6 +39,7 @@ enum PaymentMethod {
   CASH
   TRANSFER
   CARD
+  VNPAY
 }
 
 enum PaymentStatus {

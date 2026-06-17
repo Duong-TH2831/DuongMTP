@@ -180,9 +180,47 @@ export default function CheckoutPayment() {
     }
   };
 
-  const handleCheckoutPaymentConfirm = () => {
+  const handleCheckoutPaymentConfirm = async () => {
     if (!selectedStayId) {
       toast.error('Vui lòng chọn hồ sơ khách lưu trú cần thanh toán.');
+      return;
+    }
+
+    if (paymentMethod === 'VNPAY') {
+      try {
+        const toastId = toast.loading('Đang khởi tạo thanh toán VNPay...');
+        
+        // Save checkout intent to sessionStorage so we can complete it after redirect
+        sessionStorage.setItem('vnpay_checkout_intent', JSON.stringify({
+          stayId: selectedStayId,
+          notes,
+          staffId: 'usr-staff-1',
+          discountVal,
+          totalCharged
+        }));
+
+        const response = await fetch('/api/vnpay/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: totalCharged,
+            orderDescription: `Thanh toan hoa don resort phong`,
+            language: 'vn'
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.redirectUrl) {
+          toast.dismiss(toastId);
+          window.location.href = data.redirectUrl; // Redirect to VNPAY Sandbox
+        } else {
+          toast.dismiss(toastId);
+          toast.error(data.error || 'Lỗi khởi tạo URL thanh toán');
+        }
+      } catch (e) {
+        toast.error('Có lỗi xảy ra khi kết nối VNPAY.');
+      }
       return;
     }
 
@@ -331,6 +369,7 @@ export default function CheckoutPayment() {
                 <option value="TRANSFER" className="bg-[#111118]">Chuyển khoản Ngân hàng (TRANSFER)</option>
                 <option value="CARD" className="bg-[#111118]">Thẻ tín dụng (CARD)</option>
                 <option value="CASH" className="bg-[#111118]">Tiền mặt tại quầy (CASH)</option>
+                <option value="VNPAY" className="bg-[#111118]">Ví điện tử VNPay (Sandbox)</option>
               </select>
             </div>
 

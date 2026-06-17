@@ -245,7 +245,7 @@ export default function LandingPage() {
     setCheckoutModalOpen(true);
   };
 
-  const handleConfirmBooking = (e: React.FormEvent) => {
+  const handleConfirmBooking = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Simple Validation
@@ -289,11 +289,43 @@ export default function LandingPage() {
       status: 'PENDING',
       totalPrice: finalPrice,
       depositAmount: paymentMethod === 'TRANSFER' ? finalPrice * 0.5 : 0,
-      paymentMethod: paymentMethod,
+      paymentMethod: paymentMethod === 'TRANSFER' ? 'VNPAY' : paymentMethod,
       paymentStatus: 'UNPAID',
       specialRequests: specialRequests || undefined,
       createdById: 'usr-staff-1' // Staff simulated
     });
+
+    if (paymentMethod === 'TRANSFER') {
+      try {
+        const toastId = toast.loading(language === 'VI' ? 'Đang khởi tạo thanh toán VNPay...' : 'Initializing VNPay...');
+        
+        sessionStorage.setItem('public_vnpay_booking_code', newBooking.bookingCode);
+
+        const response = await fetch('/api/vnpay/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: finalPrice,
+            orderDescription: `Thanh toan dat phong Horizon - ${newBooking.bookingCode}`,
+            language: language === 'VI' ? 'vn' : 'en',
+            returnUrl: `${window.location.origin}/vnpay_return`
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.redirectUrl) {
+          toast.dismiss(toastId);
+          window.location.href = data.redirectUrl; 
+        } else {
+          toast.dismiss(toastId);
+          toast.error(data.error || 'Lỗi khởi tạo URL thanh toán');
+        }
+      } catch (e) {
+        toast.error('Có lỗi xảy ra khi kết nối VNPAY.');
+      }
+      return;
+    }
 
     setCreatedBookingCode(newBooking.bookingCode);
     setQrPaymentStatus('PENDING');

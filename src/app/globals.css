@@ -1,0 +1,330 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #c9a84c;
+  --color-gold-light: #e8c97a;
+  --color-gold-glow: rgba(201, 168, 76, 0.3);
+  --color-navy: #1a2b5e;
+  --color-navy-dark: #111e42;
+  --color-navy-light: #1e3a8a;
+  --color-admin-bg: #f0f4ff;
+  --color-status-available: #22c55e;
+  --color-status-booked: #f97316;
+  --color-status-occupied: #3b82f6;
+  --color-status-maintenance: #ef4444;
+  --color-status-cleaning: #9ca3af;
+  
+  --font-cormorant: var(--font-cormorant);
+  --font-dmsans: var(--font-dmsans);
+  --font-bevietnam: var(--font-bevietnam);
+}
+
+:root {
+  --font-cormorant: 'Cormorant Garamond', serif;
+  --font-dmsans: 'DM Sans', sans-serif;
+  --font-bevietnam: 'Be Vietnam Pro', sans-serif;
+  scroll-behavior: smooth;
+}
+
+body {
+  color: #f5f0e8;
+  background-color: #0a0a0f;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0f;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9a84c40;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c9a84c80;
+}
+
+/* Custom animations for fog/mist drifting */
+@keyframes drift {
+  0% {
+    transform: translateX(-50%) translateZ(0);
+  }
+  50% {
+    transform: translateX(0%) translateZ(0);
+  }
+  100% {
+    transform: translateX(-50%) translateZ(0);
+  }
+}
+
+.fog-layer {
+  animation: drift 120s linear infinite;
+  background-image: radial-gradient(circle, rgba(201, 168, 76, 0.05) 0%, transparent 70%);
+}
+
+/* Custom mouse cursor effects */
+.custom-cursor-ring {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #c9a84c50;
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transition: transform 0.08s ease-out;
+  transform: translate(-50%, -50%);
+}
+
+.custom-cursor-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #c9a84c;
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+}
+
+/* Admin container layout */
+.admin-container {
+  zoom: 1;
+}
+
+/* A4 Print Layout */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Luxury Light Mode Styling Overrides */
+html.light body {
+  background-color: #faf8f5 !important;
+  color: #1c1917 !important;
+}
+
+html.light [class*="bg-[#0a0a0f]"] {
+  background-color: #faf8f5 !important;
+}
+
+html.light [class*="bg-[#111118]"] {
+  background-color: #ffffff !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light [class*="bg-[#07070a]"] {
+  background-color: #f5f0e8 !important;
+  color: #1c1917 !important;
+}
+
+html.light [class*="bg-[#07070a]/40"] {
+  background-color: rgba(245, 240, 232, 0.4) !important;
+}
+
+html.light [class*="bg-[#07070a]/50"] {
+  background-color: rgba(245, 240, 232, 0.5) !important;
+}
+
+/* Sidebar Specific overrides */
+html.light aside {
+  background-color: #f5f0e8 !important;
+  border-right-color: rgba(201, 168, 76, 0.25) !important;
+}
+
+html.light aside a {
+  color: #44403c !important;
+}
+
+html.light aside a:hover:not(.bg-gold) {
+  background-color: rgba(201, 168, 76, 0.08) !important;
+  color: #a67c1e !important;
+}
+
+html.light aside button {
+  color: #44403c !important;
+  background-color: transparent !important;
+  border: none !important;
+}
+
+html.light aside button:hover:not(.bg-gold) {
+  background-color: rgba(201, 168, 76, 0.08) !important;
+  color: #a67c1e !important;
+}
+
+html.light aside button.text-red-300 {
+  color: #b91c1c !important;
+}
+
+html.light aside button.text-red-300:hover {
+  background-color: rgba(185, 28, 28, 0.08) !important;
+  color: #7f1d1d !important;
+}
+
+html.light aside h4 {
+  color: #1c1917 !important;
+}
+
+html.light aside [class*="bg-[#111118]/50"],
+html.light aside [class*="bg-[#111118]/30"] {
+  background-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Text Overrides */
+html.light .text-stone-100,
+html.light .text-stone-200,
+html.light .text-stone-300,
+html.light .text-stone-250,
+html.light .text-white,
+html.light .text-slate-100,
+html.light .text-slate-200 {
+  color: #1c1917 !important;
+}
+
+html.light .text-stone-400,
+html.light .text-stone-500,
+html.light .text-stone-450,
+html.light .text-slate-400,
+html.light .text-slate-500,
+html.light [class*="text-[#9a9080]"],
+html.light [class*="text-slate-200/80"] {
+  color: #6b665c !important;
+}
+
+html.light .text-gold {
+  color: #a67c1e !important;
+}
+
+html.light .hover\:text-gold:hover {
+  color: #c9a84c !important;
+}
+
+html.light .text-stone-600 {
+  color: #44403c !important;
+}
+
+/* Borders Overrides */
+html.light .border-gold\/5 {
+  border-color: rgba(201, 168, 76, 0.15) !important;
+}
+
+html.light .border-gold\/10 {
+  border-color: rgba(201, 168, 76, 0.25) !important;
+}
+
+html.light .border-gold\/15,
+html.light .border-gold\/20 {
+  border-color: rgba(201, 168, 76, 0.4) !important;
+}
+
+html.light .border-slate-100,
+html.light .border-slate-200 {
+  border-color: rgba(201, 168, 76, 0.15) !important;
+}
+
+/* Input Fields Overrides */
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #1c1917 !important;
+  border-color: rgba(201, 168, 76, 0.3) !important;
+}
+
+html.light input:focus,
+html.light select:focus,
+html.light textarea:focus {
+  border-color: #a67c1e !important;
+  background-color: #ffffff !important;
+}
+
+html.light select option {
+  background-color: #ffffff !important;
+  color: #1c1917 !important;
+}
+
+html.light input:read-only,
+html.light select:disabled,
+html.light textarea:read-only {
+  background-color: #f5f0e8 !important;
+  color: #78716c !important;
+}
+
+/* Hover Overrides */
+html.light [class*="hover:bg-[#1a1a24]"]:hover,
+html.light [class*="hover:bg-white/5"]:hover,
+html.light [class*="hover:bg-slate-50"]:hover {
+  background-color: rgba(201, 168, 76, 0.08) !important;
+}
+
+/* Scrollbar Light */
+html.light ::-webkit-scrollbar-track {
+  background: #faf8f5 !important;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(166, 124, 30, 0.2) !important;
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(166, 124, 30, 0.4) !important;
+}
+
+/* Header/Navbar on Client Page */
+html.light header {
+  background-color: rgba(250, 248, 245, 0.85) !important;
+  border-bottom-color: rgba(201, 168, 76, 0.2) !important;
+}
+html.light header a,
+html.light header span,
+html.light header button {
+  color: #44403c !important;
+}
+html.light header a:hover,
+html.light header button:hover {
+  color: #a67c1e !important;
+}
+html.light header .font-cormorant {
+  color: #a67c1e !important;
+}
+
+/* Mobile drawer menu light mode */
+html.light header div.fixed {
+  background-color: rgba(250, 248, 245, 0.98) !important;
+}
+
+/* Status Badges */
+html.light .bg-green-50\/20,
+html.light .bg-emerald-950\/10 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+html.light .bg-orange-50\/10,
+html.light .bg-amber-950\/10 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+html.light .bg-blue-50\/20,
+html.light .bg-blue-950\/10 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+html.light .bg-red-50\/10,
+html.light .bg-red-950\/10 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+html.light .bg-yellow-50\/10,
+html.light .bg-yellow-950\/10 {
+  background-color: rgba(234, 179, 8, 0.1) !important;
+}
+

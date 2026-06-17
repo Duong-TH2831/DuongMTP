@@ -1,0 +1,305 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum RoomStatus {
+  AVAILABLE
+  BOOKED
+  OCCUPIED
+  MAINTENANCE
+  CLEANING
+}
+
+enum CustomerMemberType {
+  REGULAR
+  VIP
+  FREQUENT
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum StayStatus {
+  STAYING
+  CHECKED_OUT
+  EARLY_CHECKOUT
+}
+
+enum CouponDiscountType {
+  PERCENT
+  FIXED
+}
+
+model User {
+  id           String        @id @default(uuid())
+  name         String
+  email        String        @unique
+  password     String
+  role         Role          @default(STAFF)
+  avatar       String?
+  phone        String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  bookings     Booking[]     @relation("BookingCreatedBy")
+  stays        StayRecord[]  @relation("StayStaff")
+  invoices     Invoice[]     @relation("InvoiceCreatedBy")
+  notifications Notification[]
+  activityLogs ActivityLog[]
+  blogs        Blog[]
+}
+
+model Account {
+  id                 String  @id @default(uuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+}
+
+model RoomType {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  description  String?  @db.Text
+  basePrice    Float
+  maxOccupancy Int
+  amenities    String[] // Standard PostgreSQL text array
+  images       String[]
+  createdAt    DateTime @default(now())
+  rooms        Room[]
+}
+
+model Room {
+  id           String      @id @default(uuid())
+  roomNumber   String      @unique
+  floor        Int
+  roomTypeId   String
+  roomType     RoomType    @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  status       RoomStatus  @default(AVAILABLE)
+  description  String?     @db.Text
+  images       String[]
+  lastCleaned  DateTime?
+  notes        String?     @db.Text
+  bookings     Booking[]
+  stays        StayRecord[]
+  reviews      Review[]
+}
+
+model Customer {
+  id          String             @id @default(uuid())
+  fullName    String
+  email       String?            @unique
+  phone       String             @unique
+  cccd        String             @unique
+  dateOfBirth DateTime?
+  gender      String?
+  address     String?            @db.Text
+  avatar      String?
+  memberType  CustomerMemberType @default(REGULAR)
+  isActive    Boolean            @default(true)
+  joinDate    DateTime           @default(now())
+  totalStays  Int                @default(0)
+  totalSpent  Float              @default(0.0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  bookings    Booking[]
+  stays       StayRecord[]
+  invoices    Invoice[]
+  reviews     Review[]
+}
+
+model Booking {
+  id               String        @id @default(uuid())
+  bookingCode      String        @unique // Format: BK-YYYY-XXXXX
+  customerId       String
+  customer         Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  roomId           String
+  room             Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  checkInDate      DateTime
+  checkOutDate     DateTime
+  numberOfNights   Int
+  numberOfAdults   Int           @default(1)
+  numberOfChildren Int           @default(0)
+  status           BookingStatus @default(PENDING)
+  totalPrice       Float
+  depositAmount    Float         @default(0.0)
+  paymentMethod    PaymentMethod @default(CASH)
+  paymentStatus    PaymentStatus @default(UNPAID)
+  specialRequests  String?       @db.Text
+  notes            String?       @db.Text
+  createdById      String
+  createdBy        User          @relation("BookingCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  stayRecords      StayRecord[]
+}
+
+model StayRecord {
+  id             String      @id @default(uuid())
+  stayCode       String      @unique // Format: STAY-XXXX
+  bookingId      String
+  booking        Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  roomId         String
+  room           Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  actualCheckIn  DateTime    @default(now())
+  actualCheckOut DateTime?
+  status         StayStatus  @default(STAYING)
+  extraServices  Json?       // JSON list of extra services consumed
+  totalCharged   Float       @default(0.0)
+  staffId        String
+  staff          User        @relation("StayStaff", fields: [staffId], references: [id])
+  invoices       Invoice[]
+  reviews        Review[]
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceCode   String        @unique // Format: #INV-YYYY-XXXXX
+  stayId        String
+  stay          StayRecord    @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  subTotal      Float
+  vat           Float         @default(10.0) // 10%
+  discount      Float         @default(0.0)
+  totalAmount   Float
+  isPaid        Boolean       @default(false)
+  paymentMethod PaymentMethod @default(CASH)
+  notes         String?       @db.Text
+  createdById   String
+  createdBy     User          @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime      @default(now())
+  items         InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Float
+  amount      Float
+}
+
+model ExtraService {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  price     Float
+  unit      String
+  category  String
+  isActive  Boolean  @default(true)
+}
+
+model Coupon {
+  id            String             @id @default(uuid())
+  code          String             @unique
+  discountType  CouponDiscountType @default(PERCENT)
+  discountValue Float
+  minOrderValue Float              @default(0.0)
+  maxUsage      Int                @default(100)
+  usedCount     Int                @default(0)
+  expiryDate    DateTime
+  isActive      Boolean            @default(true)
+}
+
+model Review {
+  id          String     @id @default(uuid())
+  customerId  String
+  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  roomId      String
+  room        Room       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  stayId      String
+  stay        StayRecord @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  rating      Int        @default(5)
+  comment     String?    @db.Text
+  adminReply  String?    @db.Text
+  isApproved  Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String   @db.Text
+  type      String   @default("info") // info, warning, success, booking
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action      String
+  entityType  String
+  entityId    String?
+  description String   @db.Text
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+}
+
+model Blog {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  excerpt     String   @db.Text
+  content     String   @db.Text
+  image       String?
+  views       Int      @default(0)
+  isPublished Boolean  @default(false)
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

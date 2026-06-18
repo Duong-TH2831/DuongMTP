@@ -130,6 +130,18 @@ export interface Invoice {
   createdById: string;
 }
 
+export interface BlockchainTransaction {
+  id: string;
+  txHash: string;
+  invoiceId: string;
+  invoiceCode: string;
+  paymentMethod: string;
+  amount: number;
+  timestamp: string;
+  status: 'Confirmed' | 'Pending' | 'Failed';
+  blockNumber: number;
+}
+
 export interface ExtraService {
   id: string;
   name: string;
@@ -721,6 +733,7 @@ class MockDatabase {
   private bookings: Booking[] = [];
   private stays: StayRecord[] = [];
   private invoices: Invoice[] = [];
+  private blockchainTransactions: BlockchainTransaction[] = [];
   private users: User[] = USERS;
   private roomTypes: RoomType[] = ROOM_TYPES;
   private extraServices: ExtraService[] = EXTRA_SERVICES;
@@ -744,6 +757,68 @@ class MockDatabase {
           this.bookings = parsed.bookings || [];
           this.stays = parsed.stays || [];
           this.invoices = parsed.invoices || [];
+          this.blockchainTransactions = parsed.blockchainTransactions || [];
+          
+          let modifiedTx = false;
+
+          // Sync missing PAID Invoices
+          this.invoices.filter(i => i.isPaid).forEach((inv, idx) => {
+            if (!this.blockchainTransactions.some(tx => tx.invoiceId === inv.id)) {
+              let hash = 0;
+              const str = inv.id + inv.issueDate + "HorizonHMS";
+              for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = hash & hash;
+              }
+              const hex = Math.abs(hash).toString(16);
+              const txHash = `0x${hex}000000000000000000000000000000000000000000000000`.slice(0, 42);
+              this.blockchainTransactions.push({
+                id: `tx-sync-inv-${Date.now()}-${idx}`,
+                txHash,
+                invoiceId: inv.id,
+                invoiceCode: inv.invoiceCode,
+                paymentMethod: inv.paymentMethod,
+                amount: inv.totalAmount,
+                timestamp: inv.issueDate,
+                status: 'Confirmed',
+                blockNumber: 120000 + this.blockchainTransactions.length + 1
+              });
+              modifiedTx = true;
+            }
+          });
+
+          // Sync missing PAID Bookings
+          this.bookings.filter(b => b.paymentStatus === 'PAID').forEach((bk, idx) => {
+            if (!this.blockchainTransactions.some(tx => tx.invoiceId === bk.id)) {
+              let hash = 0;
+              const str = bk.id + bk.createdAt + "HorizonHMS";
+              for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = hash & hash;
+              }
+              const hex = Math.abs(hash).toString(16);
+              const txHash = `0x${hex}000000000000000000000000000000000000000000000000`.slice(0, 42);
+              this.blockchainTransactions.push({
+                id: `tx-sync-bk-${Date.now()}-${idx}`,
+                txHash,
+                invoiceId: bk.id,
+                invoiceCode: bk.bookingCode,
+                paymentMethod: bk.paymentMethod || 'VNPAY',
+                amount: bk.totalPrice,
+                timestamp: bk.createdAt,
+                status: 'Confirmed',
+                blockNumber: 120000 + this.blockchainTransactions.length + 1
+              });
+              modifiedTx = true;
+            }
+          });
+
+          if (modifiedTx) {
+            // Update localStorage with synced transactions
+            const data = { ...parsed, blockchainTransactions: this.blockchainTransactions };
+            localStorage.setItem('horizon_hms_data', JSON.stringify(data));
+          }
+          
           this.users = parsed.users || USERS;
           this.roomTypes = parsed.roomTypes || ROOM_TYPES;
           this.extraServices = parsed.extraServices || EXTRA_SERVICES;
@@ -765,6 +840,29 @@ class MockDatabase {
     this.stays = generateMockStays(this.bookings);
     this.invoices = generateMockInvoices(this.stays, this.bookings, this.customers);
     
+    // Generate initial blockchain transactions from mock invoices
+    this.blockchainTransactions = this.invoices.filter(inv => inv.isPaid).map((inv, idx) => {
+      let hash = 0;
+      const str = inv.id + inv.issueDate + "HorizonHMS";
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash = hash & hash;
+      }
+      const hex = Math.abs(hash).toString(16);
+      const txHash = `0x${hex}000000000000000000000000000000000000000000000000`.slice(0, 42);
+      return {
+        id: `tx-${Date.now()}-${idx}`,
+        txHash,
+        invoiceId: inv.id,
+        invoiceCode: inv.invoiceCode,
+        paymentMethod: inv.paymentMethod,
+        amount: inv.totalAmount,
+        timestamp: inv.issueDate,
+        status: 'Confirmed',
+        blockNumber: 120000 + idx
+      };
+    });
+
     // Create initial notifications
     this.notifications = [
       { id: 'not-1', userId: 'usr-admin-1', title: 'Yêu cầu dọn dẹp', message: 'Phòng 102 vừa check-out, cần nhân viên dọn dẹp ngay.', type: 'warning', isRead: false, createdAt: new Date().toISOString() },
@@ -789,6 +887,7 @@ class MockDatabase {
         bookings: this.bookings,
         stays: this.stays,
         invoices: this.invoices,
+        blockchainTransactions: this.blockchainTransactions,
         users: this.users,
         roomTypes: this.roomTypes,
         extraServices: this.extraServices,
@@ -799,6 +898,14 @@ class MockDatabase {
       };
       localStorage.setItem('horizon_hms_data', JSON.stringify(data));
     }
+  }
+
+  // BLOCKCHAIN TRANSACTIONS API
+  public getBlockchainTransactions() { return this.blockchainTransactions; }
+  public addBlockchainTransaction(tx: BlockchainTransaction) {
+    this.blockchainTransactions.push(tx);
+    this.save();
+    return tx;
   }
 
   // ROOMS API
@@ -1031,6 +1138,28 @@ class MockDatabase {
       
       this.invoices.push(newInvoice);
       
+      // Record Blockchain Transaction
+      let hash = 0;
+      const str = newInvoice.id + newInvoice.issueDate + "HorizonHMS";
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash = hash & hash;
+      }
+      const hex = Math.abs(hash).toString(16);
+      const txHash = `0x${hex}000000000000000000000000000000000000000000000000`.slice(0, 42);
+      
+      this.blockchainTransactions.push({
+        id: `tx-${Date.now()}`,
+        txHash,
+        invoiceId: newInvoice.id,
+        invoiceCode: newInvoice.invoiceCode,
+        paymentMethod: newInvoice.paymentMethod,
+        amount: newInvoice.totalAmount,
+        timestamp: newInvoice.issueDate,
+        status: 'Confirmed',
+        blockNumber: 120000 + this.blockchainTransactions.length + 1
+      });
+
       // Update Customer Stats
       const customer = this.customers.find(c => c.id === stay.customerId);
       if (customer) {

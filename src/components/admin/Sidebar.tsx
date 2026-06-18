@@ -7,7 +7,7 @@ import { useAppState } from '@/store';
 import { 
   LayoutDashboard, Users, BedDouble, CalendarCheck, 
   Hotel, CreditCard, BarChart2, Settings, FileText, 
-  LogOut, ShieldAlert, Sun, Moon
+  LogOut, ShieldAlert, Sun, Moon, Database
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,6 +36,7 @@ export default function Sidebar() {
     { name: 'Phiếu đặt phòng', path: '/admin/bookings', icon: CalendarCheck },
     { name: 'Quản lý Lưu trú', path: '/admin/stay', icon: Hotel },
     { name: 'Thanh toán hóa đơn', path: '/admin/payment', icon: CreditCard },
+    { name: 'Blockchain', path: '/admin/blockchain', icon: Database },
     { name: 'Quản lý tài khoản', path: '/admin/accounts', icon: Settings },
     { name: 'Báo cáo & Thống kê', path: '/admin/reports', icon: BarChart2 },
     { name: 'Bài viết Blog CMS', path: '/admin/blogs', icon: FileText }

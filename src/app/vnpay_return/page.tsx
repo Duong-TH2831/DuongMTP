@@ -17,7 +17,7 @@ function PublicVNPayReturnContent() {
     const processPayment = async () => {
       const vnp_ResponseCode = searchParams.get('vnp_ResponseCode');
       const vnp_TxnRef = searchParams.get('vnp_TxnRef');
-      
+
       if (!vnp_ResponseCode || !vnp_TxnRef) {
         setStatus('error');
         setErrorMessage('Dữ liệu trả về từ VNPay không hợp lệ.');
@@ -31,7 +31,7 @@ function PublicVNPayReturnContent() {
           if (storedBookingCode) {
             const db = getDB();
             const targetBooking = db.getBookings().find(b => b.bookingCode === storedBookingCode);
-            
+
             if (targetBooking) {
               db.updateBookingStatus(targetBooking.id, 'CONFIRMED');
               const idx = db.getBookings().findIndex(b => b.id === targetBooking.id);
@@ -47,10 +47,10 @@ function PublicVNPayReturnContent() {
                   timestamp: new Date().toISOString(),
                   status: 'Confirmed'
                 });
-                
+
                 db.save();
               }
-              
+
               setBookingCode(storedBookingCode);
               setStatus('success');
               sessionStorage.removeItem('public_vnpay_booking_code');
@@ -79,10 +79,10 @@ function PublicVNPayReturnContent() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-6 text-stone-200 bg-[#060608]">
       <div className="bg-[#111118] p-8 md:p-12 rounded-2xl border border-gold/15 shadow-2xl flex flex-col items-center text-center max-w-md w-full relative overflow-hidden">
-        
+
         {/* Top edge glow */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gold to-transparent opacity-50" />
-        
+
         {status === 'loading' && (
           <>
             <Loader2 className="w-16 h-16 text-gold animate-spin mb-4" />
@@ -104,7 +104,7 @@ function PublicVNPayReturnContent() {
                 <p className="font-mono text-xl text-gold font-bold">{bookingCode}</p>
               </div>
             )}
-            <Link 
+            <Link
               href="/"
               className="px-8 py-3.5 bg-gold hover:bg-gold-light text-black font-bold uppercase tracking-widest rounded text-xs transition-colors w-full"
             >
@@ -120,7 +120,7 @@ function PublicVNPayReturnContent() {
             </div>
             <h2 className="text-2xl font-bold font-cormorant text-red-400">Giao dịch thất bại</h2>
             <p className="text-sm text-stone-300 mt-2">{errorMessage}</p>
-            <Link 
+            <Link
               href="/"
               className="mt-6 px-6 py-2.5 bg-[#1a1a24] border border-gold/20 hover:border-gold/50 text-stone-200 font-bold uppercase tracking-wider rounded text-xs transition-colors"
             >

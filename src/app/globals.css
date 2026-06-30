@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -328,3 +329,19 @@ html.light .bg-yellow-950\/10 {
   background-color: rgba(234, 179, 8, 0.1) !important;
 }
 
+/* Signature Image Dynamic Mode */
+.signature-img {
+  mix-blend-mode: screen;
+}
+
+html.light .signature-img {
+  filter: invert(1) !important;
+  mix-blend-mode: multiply !important;
+}
+
+@media print {
+  .signature-img {
+    filter: invert(1) !important;
+    mix-blend-mode: multiply !important;
+  }
+}

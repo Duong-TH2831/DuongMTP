@@ -129,6 +129,7 @@ export interface Invoice {
   paymentMethod: PaymentMethod;
   notes?: string;
   createdById: string;
+  prePaidAmount?: number;
 }
 
 // BlockchainTransaction is now imported from ./blockchain
@@ -378,7 +379,7 @@ const BLOGS: Blog[] = [
 function generateMockRooms(): Room[] {
   const rooms: Room[] = [];
   const roomTypes = ROOM_TYPES;
-  
+
   // Status allocation: 120 rooms total
   // 42 AVAILABLE, 32 BOOKED, 34 OCCUPIED, 6 MAINTENANCE, 6 CLEANING
   const statuses: RoomStatus[] = [];
@@ -387,34 +388,34 @@ function generateMockRooms(): Room[] {
   for (let i = 0; i < 34; i++) statuses.push('OCCUPIED');
   for (let i = 0; i < 6; i++) statuses.push('MAINTENANCE');
   for (let i = 0; i < 6; i++) statuses.push('CLEANING');
-  
+
   // Shuffle deterministically using a simple LCG pseudorandom generator
   let seed = 42;
   const random = () => {
     const x = Math.sin(seed++) * 10000;
     return x - Math.floor(x);
   };
-  
+
   for (let i = statuses.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     const temp = statuses[i];
     statuses[i] = statuses[j];
     statuses[j] = temp;
   }
-  
+
   let statusIndex = 0;
-  
+
   // Generate 24 rooms per floor for 5 floors
   for (let floor = 1; floor <= 5; floor++) {
     for (let r = 1; r <= 24; r++) {
       const roomNum = floor * 100 + r;
       const roomNumber = roomNum.toString().padStart(3, '0');
-      
+
       // Select room type based on index
       // Floor 5: Penthouse (1-2), Villa (3-5), Bungalow (6-8), and Deluxe
       // Other floors: Distributed
       let roomType = roomTypes[3]; // Default Standard Double
-      
+
       if (floor === 5 && r <= 2) {
         roomType = roomTypes[2]; // Penthouse
       } else if (floor === 5 && r <= 6) {
@@ -434,9 +435,9 @@ function generateMockRooms(): Room[] {
       } else if (r % 6 === 5) {
         roomType = roomTypes[5]; // Family
       }
-      
+
       const status = statuses[statusIndex++];
-      
+
       rooms.push({
         id: `rm-${roomNumber}`,
         roomNumber,
@@ -449,7 +450,7 @@ function generateMockRooms(): Room[] {
       });
     }
   }
-  
+
   return rooms;
 }
 
@@ -468,18 +469,18 @@ const VIETNAMESE_NAMES = [
 
 function generateMockCustomers(): Customer[] {
   const customers: Customer[] = [];
-  
+
   let seed = 100;
   const random = () => {
     const x = Math.sin(seed++) * 10000;
     return x - Math.floor(x);
   };
-  
+
   for (let i = 0; i < 50; i++) {
     const isVIP = i < 10;
     const isFrequent = i >= 10 && i < 25;
     const memberType: CustomerMemberType = isVIP ? 'VIP' : (isFrequent ? 'FREQUENT' : 'REGULAR');
-    
+
     const id = `cus-${(i + 1).toString().padStart(6, '0')}`;
     const name = VIETNAMESE_NAMES[i];
     const email = `${name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '')}@gmail.com`;
@@ -487,7 +488,7 @@ function generateMockCustomers(): Customer[] {
     const cccd = `${301000000000 + Math.floor(random() * 9999999999)}`;
     const totalStays = isVIP ? Math.floor(15 + random() * 20) : (isFrequent ? Math.floor(5 + random() * 10) : Math.floor(1 + random() * 4));
     const totalSpent = isVIP ? Math.floor(35000000 + random() * 150000000) : (isFrequent ? Math.floor(12000000 + random() * 30000000) : Math.floor(2000000 + random() * 8000000));
-    
+
     customers.push({
       id,
       fullName: name,
@@ -505,27 +506,27 @@ function generateMockCustomers(): Customer[] {
       createdAt: new Date(2023, Math.floor(random() * 12), Math.floor(random() * 28) + 1).toISOString()
     });
   }
-  
+
   return customers;
 }
 
 function generateMockBookings(rooms: Room[], customers: Customer[]): Booking[] {
   const bookings: Booking[] = [];
-  
+
   let seed = 500;
   const random = () => {
     const x = Math.sin(seed++) * 10000;
     return x - Math.floor(x);
   };
-  
+
   const occupiedRooms = rooms.filter(r => r.status === 'OCCUPIED');
   const bookedRooms = rooms.filter(r => r.status === 'BOOKED');
-  
+
   // Create 20 mock bookings
   // 10 active bookings (matching occupied rooms)
   // 5 upcoming bookings (matching booked rooms)
   // 5 completed bookings (past)
-  
+
   // 1. Stays currently active (CHECKED_IN / OCCUPIED)
   for (let i = 0; i < Math.min(10, occupiedRooms.length); i++) {
     const room = occupiedRooms[i];
@@ -533,12 +534,12 @@ function generateMockBookings(rooms: Room[], customers: Customer[]): Booking[] {
     const nights = Math.floor(2 + random() * 5);
     const roomType = ROOM_TYPES.find(rt => rt.id === room.roomTypeId)!;
     const totalPrice = nights * roomType.basePrice;
-    
+
     const checkIn = new Date();
     checkIn.setDate(checkIn.getDate() - Math.floor(1 + random() * 3));
     const checkOut = new Date(checkIn);
     checkOut.setDate(checkOut.getDate() + nights);
-    
+
     const id = `bk-active-${i + 1}`;
     bookings.push({
       id,
@@ -560,7 +561,7 @@ function generateMockBookings(rooms: Room[], customers: Customer[]): Booking[] {
       createdAt: new Date(checkIn.getTime() - 5 * 24 * 3600 * 1000).toISOString()
     });
   }
-  
+
   // 2. Upcoming reservations (CONFIRMED / BOOKED)
   for (let i = 0; i < Math.min(5, bookedRooms.length); i++) {
     const room = bookedRooms[i];
@@ -568,12 +569,12 @@ function generateMockBookings(rooms: Room[], customers: Customer[]): Booking[] {
     const nights = Math.floor(1 + random() * 3);
     const roomType = ROOM_TYPES.find(rt => rt.id === room.roomTypeId)!;
     const totalPrice = nights * roomType.basePrice;
-    
+
     const checkIn = new Date();
     checkIn.setDate(checkIn.getDate() + Math.floor(1 + random() * 4));
     const checkOut = new Date(checkIn);
     checkOut.setDate(checkOut.getDate() + nights);
-    
+
     const id = `bk-booked-${i + 1}`;
     bookings.push({
       id,
@@ -595,7 +596,7 @@ function generateMockBookings(rooms: Room[], customers: Customer[]): Booking[] {
       createdAt: new Date().toISOString()
     });
   }
-  
+
   // 3. Past completed bookings (CHECKED_OUT)
   for (let i = 0; i < 5; i++) {
     const room = rooms[i * 4];
@@ -603,12 +604,12 @@ function generateMockBookings(rooms: Room[], customers: Customer[]): Booking[] {
     const nights = Math.floor(1 + random() * 4);
     const roomType = ROOM_TYPES.find(rt => rt.id === room.roomTypeId)!;
     const totalPrice = nights * roomType.basePrice;
-    
+
     const checkIn = new Date();
     checkIn.setDate(checkIn.getDate() - Math.floor(10 + random() * 10));
     const checkOut = new Date(checkIn);
     checkOut.setDate(checkOut.getDate() + nights);
-    
+
     const id = `bk-past-${i + 1}`;
     bookings.push({
       id,
@@ -629,7 +630,7 @@ function generateMockBookings(rooms: Room[], customers: Customer[]): Booking[] {
       createdAt: new Date(checkIn.getTime() - 15 * 24 * 3600 * 1000).toISOString()
     });
   }
-  
+
   return bookings;
 }
 
@@ -637,7 +638,7 @@ function generateMockStays(bookings: Booking[]): StayRecord[] {
   const stays: StayRecord[] = [];
   const checkedInBookings = bookings.filter(b => b.status === 'CHECKED_IN');
   const pastBookings = bookings.filter(b => b.status === 'CHECKED_OUT');
-  
+
   // Stays currently staying
   checkedInBookings.forEach((b, idx) => {
     stays.push({
@@ -658,7 +659,7 @@ function generateMockStays(bookings: Booking[]): StayRecord[] {
       staffId: b.createdById
     });
   });
-  
+
   // Past stays checked out
   pastBookings.forEach((b, idx) => {
     stays.push({
@@ -677,22 +678,22 @@ function generateMockStays(bookings: Booking[]): StayRecord[] {
       staffId: b.createdById
     });
   });
-  
+
   return stays;
 }
 
 function generateMockInvoices(stays: StayRecord[], bookings: Booking[], customers: Customer[]): Invoice[] {
   const invoices: Invoice[] = [];
   const completedStays = stays.filter(s => s.status === 'CHECKED_OUT');
-  
+
   completedStays.forEach((s, idx) => {
     const booking = bookings.find(b => b.id === s.bookingId)!;
     const customer = customers.find(c => c.id === s.customerId)!;
-    
+
     const subTotal = booking.totalPrice + s.totalCharged;
     const vat = subTotal * 0.1;
     const totalAmount = subTotal + vat;
-    
+
     invoices.push({
       id: `inv-${idx + 1}`,
       invoiceCode: `INV-2026-${(10000 + idx).toString().slice(1)}`,
@@ -710,7 +711,7 @@ function generateMockInvoices(stays: StayRecord[], bookings: Booking[], customer
       createdById: s.staffId
     });
   });
-  
+
   return invoices;
 }
 
@@ -732,11 +733,37 @@ class MockDatabase {
   private blogs: Blog[] = BLOGS;
   private notifications: Notification[] = [];
   private logs: ActivityLog[] = [];
-  
+
   constructor() {
     this.init();
+    this.syncRoomStatuses();
   }
-  
+
+  private syncRoomStatuses() {
+    let modified = false;
+    this.rooms.forEach(room => {
+      if (room.status === 'MAINTENANCE' || room.status === 'CLEANING') return;
+
+      const isStaying = this.stays.some(s => s.roomId === room.id && s.status === 'STAYING');
+      const isBooked = this.bookings.some(b => b.roomId === room.id && (b.status === 'CONFIRMED' || b.status === 'PENDING'));
+
+      if (isStaying && room.status !== 'OCCUPIED') {
+        room.status = 'OCCUPIED';
+        modified = true;
+      } else if (!isStaying && isBooked && room.status !== 'BOOKED') {
+        room.status = 'BOOKED';
+        modified = true;
+      } else if (!isStaying && !isBooked && (room.status === 'OCCUPIED' || room.status === 'BOOKED')) {
+        room.status = 'AVAILABLE';
+        modified = true;
+      }
+    });
+
+    if (modified) {
+      this.save();
+    }
+  }
+
   private init() {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('horizon_hms_data');
@@ -749,7 +776,7 @@ class MockDatabase {
           this.stays = parsed.stays || [];
           this.invoices = parsed.invoices || [];
           this.blockchain = parsed.blockchain && parsed.blockchain.length > 0 ? parsed.blockchain : [createGenesisBlock()];
-          
+
           let modifiedTx = false;
 
           // Helper to get all transactions for quick lookup
@@ -775,8 +802,8 @@ class MockDatabase {
             }
           });
 
-          // Sync missing PAID Bookings
-          this.bookings.filter(b => b.paymentStatus === 'PAID').forEach((bk, idx) => {
+          // Sync missing PAID Bookings (only if they were online prepayments)
+          this.bookings.filter(b => b.paymentStatus === 'PAID' && (b.paymentMethod === 'VNPAY' || b.paymentMethod === 'TRANSFER')).forEach((bk, idx) => {
             if (!allTxs.some(tx => tx.invoiceId === bk.id)) {
               const prevBlock = this.blockchain[this.blockchain.length - 1];
               const newTx: BlockchainTransaction = {
@@ -800,7 +827,7 @@ class MockDatabase {
             const data = { ...parsed, blockchain: this.blockchain };
             localStorage.setItem('horizon_hms_data', JSON.stringify(data));
           }
-          
+
           this.users = parsed.users || USERS;
           this.roomTypes = parsed.roomTypes || ROOM_TYPES;
           this.extraServices = parsed.extraServices || EXTRA_SERVICES;
@@ -814,14 +841,14 @@ class MockDatabase {
         }
       }
     }
-    
+
     // First time init / Fallback
     this.rooms = generateMockRooms();
     this.customers = generateMockCustomers();
     this.bookings = generateMockBookings(this.rooms, this.customers);
     this.stays = generateMockStays(this.bookings);
     this.invoices = generateMockInvoices(this.stays, this.bookings, this.customers);
-    
+
     // Generate initial blockchain from mock invoices
     this.blockchain = [createGenesisBlock()];
     this.invoices.filter(inv => inv.isPaid).forEach((inv, idx) => {
@@ -846,16 +873,16 @@ class MockDatabase {
       { id: 'not-2', userId: 'usr-admin-1', title: 'Đặt phòng mới', message: 'Đã nhận yêu cầu đặt phòng VIP từ khách hàng Nguyễn Văn An.', type: 'booking', isRead: false, createdAt: new Date(Date.now() - 3600000).toISOString() },
       { id: 'not-3', userId: 'usr-admin-1', title: 'Cảnh báo bảo trì', message: 'Điều hòa phòng 315 gặp sự cố, đã chuyển sang trạng thái bảo trì.', type: 'info', isRead: true, createdAt: new Date(Date.now() - 7200000).toISOString() }
     ];
-    
+
     // Activity logs
     this.logs = [
       { id: 'log-1', userId: 'usr-admin-1', action: 'LOGIN', entityType: 'User', entityId: 'usr-admin-1', description: 'Đăng nhập hệ thống quản lý.', ipAddress: '192.168.1.10', createdAt: new Date(Date.now() - 36000000).toISOString() },
       { id: 'log-2', userId: 'usr-staff-1', action: 'CHECK_IN', entityType: 'StayRecord', entityId: 'stay-active-1', description: 'Thực hiện nhận phòng cho khách hàng Nguyễn Văn An.', ipAddress: '192.168.1.15', createdAt: new Date(Date.now() - 24000000).toISOString() }
     ];
-    
+
     this.save();
   }
-  
+
   public save() {
     if (typeof window !== 'undefined') {
       const data = {
@@ -879,15 +906,15 @@ class MockDatabase {
 
   // BLOCKCHAIN TRANSACTIONS API
   public getBlockchain() { return this.blockchain; }
-  
-  public getBlockchainTransactions() { 
+
+  public getBlockchainTransactions() {
     return this.blockchain.flatMap(b => b.transactions.map(tx => ({
       ...tx,
       blockNumber: b.index,
       txHash: b.hash
     })));
   }
-  
+
   public addBlockchainTransaction(tx: Omit<BlockchainTransaction, 'txHash'>) {
     const prevBlock = this.blockchain[this.blockchain.length - 1];
     const fullTx: BlockchainTransaction = { ...tx, txHash: '' };
@@ -896,7 +923,7 @@ class MockDatabase {
     this.save();
     return newBlock.transactions[0];
   }
-  
+
   public validateBlockchain() {
     return isChainValid(this.blockchain);
   }
@@ -976,19 +1003,19 @@ class MockDatabase {
       ...booking,
       createdAt: new Date().toISOString()
     };
-    
+
     // Update Room status
     const room = this.getRoom(booking.roomId);
     if (room && room.status === 'AVAILABLE') {
       this.updateRoom(room.id, { status: booking.status === 'CHECKED_IN' ? 'OCCUPIED' : 'BOOKED' });
     }
-    
+
     this.bookings.push(newBooking);
     this.logAction(booking.createdById, 'CREATE', 'Booking', newBooking.id, `Tạo phiếu đặt phòng ${newBooking.bookingCode}`);
-    
+
     // Add notification
     this.addNotification(booking.createdById, 'Đặt phòng mới', `Nhận yêu cầu đặt phòng ${newBooking.bookingCode} cho hạng phòng ${room ? this.roomTypes.find(rt => rt.id === room.roomTypeId)?.name : 'chưa rõ'}.`, 'booking');
-    
+
     this.save();
     return newBooking;
   }
@@ -997,10 +1024,10 @@ class MockDatabase {
     if (idx !== -1) {
       const oldStatus = this.bookings[idx].status;
       this.bookings[idx].status = status;
-      
+
       const booking = this.bookings[idx];
       const room = this.getRoom(booking.roomId);
-      
+
       if (room) {
         if (status === 'CONFIRMED') {
           this.updateRoom(room.id, { status: 'BOOKED' });
@@ -1012,7 +1039,7 @@ class MockDatabase {
           this.updateRoom(room.id, { status: 'AVAILABLE' });
         }
       }
-      
+
       this.logAction('usr-admin-1', 'UPDATE', 'Booking', id, `Chuyển trạng thái booking ${booking.bookingCode} từ ${oldStatus} sang ${status}`);
       this.save();
       return booking;
@@ -1058,7 +1085,59 @@ class MockDatabase {
   // STAYS API
   public getStays() { return this.stays; }
   public getStay(id: string) { return this.stays.find(s => s.id === id || s.stayCode === id); }
-  
+
+  public addStay(data: Omit<StayRecord, 'id' | 'stayCode' | 'extraServices' | 'totalCharged'>) {
+    const codeNum = Math.floor(1000 + Math.random() * 9000);
+    const newStay: StayRecord = {
+      ...data,
+      id: `stay-active-${Date.now()}`,
+      stayCode: `STAY-${codeNum}`,
+      extraServices: [],
+      totalCharged: 0
+    };
+    this.stays.push(newStay);
+    this.syncRoomStatuses();
+    this.logAction(data.staffId, 'CREATE', 'StayRecord', newStay.id, `Tạo mới hồ sơ lưu trú ${newStay.stayCode}`);
+    this.save();
+    return newStay;
+  }
+
+  public updateStay(id: string, data: Partial<StayRecord>) {
+    const idx = this.stays.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      const stay = this.stays[idx];
+      this.stays[idx] = { ...stay, ...data };
+      
+      // Đồng bộ thông tin ngược lại Phiếu đặt phòng (Booking) nếu có
+      if (stay.bookingId && !stay.bookingId.startsWith('walk-in')) {
+        const bIdx = this.bookings.findIndex(b => b.id === stay.bookingId);
+        if (bIdx !== -1) {
+          if (data.customerId) this.bookings[bIdx].customerId = data.customerId;
+          if (data.roomId) this.bookings[bIdx].roomId = data.roomId;
+        }
+      }
+
+      this.syncRoomStatuses();
+      this.logAction('usr-admin-1', 'UPDATE', 'StayRecord', id, `Cập nhật hồ sơ lưu trú ${this.stays[idx].stayCode}`);
+      this.save();
+      return this.stays[idx];
+    }
+    return null;
+  }
+
+  public deleteStay(id: string) {
+    const idx = this.stays.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      const stayCode = this.stays[idx].stayCode;
+      this.stays.splice(idx, 1);
+      this.syncRoomStatuses();
+      this.logAction('usr-admin-1', 'DELETE', 'StayRecord', id, `Xóa hồ sơ lưu trú ${stayCode}`);
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
   public addStayService(stayId: string, serviceId: string, quantity: number) {
     const stay = this.stays.find(s => s.id === stayId);
     const svc = this.extraServices.find(s => s.id === serviceId);
@@ -1097,19 +1176,24 @@ class MockDatabase {
       const stay = this.stays[stayIdx];
       stay.status = 'CHECKED_OUT';
       stay.actualCheckOut = new Date().toISOString();
-      
+
       const booking = this.bookings.find(b => b.id === stay.bookingId)!;
+      let prePaidAmount = 0;
+      if (booking.paymentStatus === 'PAID') {
+        prePaidAmount = booking.totalPrice * 1.1;
+      }
+
       booking.status = 'CHECKED_OUT';
       booking.paymentStatus = 'PAID';
-      
+
       // Update room to cleaning
       this.updateRoom(stay.roomId, { status: 'CLEANING' });
-      
+
       // Create Invoice
       const subTotal = booking.totalPrice + stay.totalCharged;
       const vat = subTotal * 0.1;
-      const totalAmount = subTotal + vat - discount;
-      
+      const totalAmount = Math.max(0, subTotal + vat - discount - prePaidAmount);
+
       const invoiceId = `inv-${Date.now()}`;
       const invCodeNum = Math.floor(1000 + Math.random() * 9000);
       const newInvoice: Invoice = {
@@ -1126,12 +1210,13 @@ class MockDatabase {
         isPaid: true,
         paymentMethod,
         notes,
-        createdById: staffId
+        createdById: staffId,
+        prePaidAmount
       };
-      
+
       this.invoices.push(newInvoice);
-      
-      // Record Blockchain Transaction
+
+      // Record Blockchain Transaction for ALL invoices, including 0đ (fully prepaid)
       this.addBlockchainTransaction({
         id: `tx-${Date.now()}`,
         invoiceId: newInvoice.id,
@@ -1148,7 +1233,7 @@ class MockDatabase {
         customer.totalStays += 1;
         customer.totalSpent += totalAmount;
       }
-      
+
       this.logAction(staffId, 'CHECK_OUT', 'StayRecord', stayId, `Khách check-out lưu trú ${stay.stayCode}, đã lập hóa đơn ${newInvoice.invoiceCode}`);
       this.save();
       return newInvoice;
@@ -1277,7 +1362,7 @@ class MockDatabase {
     const availableRooms = this.rooms.filter(r => r.status === 'AVAILABLE').length;
     const cleaningRooms = this.rooms.filter(r => r.status === 'CLEANING').length;
     const activeStays = this.stays.filter(s => s.status === 'STAYING').length;
-    
+
     // Total staying guests: Sum adults of checked-in bookings
     const activeBookings = this.bookings.filter(b => b.status === 'CHECKED_IN');
     const totalGuests = activeBookings.reduce((sum, b) => sum + b.numberOfAdults + b.numberOfChildren, 0);

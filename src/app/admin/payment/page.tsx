@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getDB, StayRecord, Customer, Booking, PaymentMethod } from '@/lib/db';
-import { 
-  CreditCard, Search, Plus, Trash2, Printer, 
+import {
+  CreditCard, Search, Plus, Trash2, Printer,
   Check, Percent, HelpCircle, DollarSign, Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,9 +36,10 @@ export default function CheckoutPayment() {
   const [discountCode, setDiscountCode] = useState('');
   const [discountVal, setDiscountVal] = useState(0);
   const [notes, setNotes] = useState('');
-  
+
   // List billing items
   const [billItems, setBillItems] = useState<BillItem[]>([]);
+  const [prePaidAmount, setPrePaidAmount] = useState(0);
 
   // Metadata display
   const [stayPeriod, setStayPeriod] = useState('Chưa có thông tin');
@@ -67,7 +68,7 @@ export default function CheckoutPayment() {
 
   const handleSelectStay = (stay: StayRecord) => {
     setSelectedStayId(stay.id);
-    
+
     const customer = customers.find(c => c.id === stay.customerId);
     const booking = bookings.find(b => b.id === stay.bookingId);
     const room = db.getRoom(stay.roomId);
@@ -75,10 +76,24 @@ export default function CheckoutPayment() {
     setCustomerName(customer ? customer.fullName : 'Khách vãng lai');
     setRoomNumber(room ? `Phòng ${room.roomNumber} (${db.getRoomTypes().find(rt => rt.id === room.roomTypeId)?.name})` : 'N/A');
     setStaySearchQuery(customer ? `${customer.fullName} - P.${room?.roomNumber}` : 'N/A');
-    
+
     if (booking) {
       setStayPeriod(`${new Date(booking.checkInDate).toLocaleDateString('vi-VN')} đến ${new Date(booking.checkOutDate).toLocaleDateString('vi-VN')} (${booking.numberOfNights} đêm)`);
+
+      const roomWithVat = booking.totalPrice * 1.1;
       
+      // Nếu trạng thái là PAID hoặc phương thức là VNPAY, ngầm định là đã trả đủ tiền phòng + VAT (trừ khi depositAmount lớn hơn)
+      if (booking.paymentStatus === 'PAID' || booking.paymentMethod === 'VNPAY') {
+        setPrePaidAmount(Math.max(booking.depositAmount || 0, roomWithVat)); 
+      } else {
+        // Nếu chỉ là đặt cọc (PARTIAL) hoặc chưa trả (PENDING), thì lấy đúng số tiền đã cọc
+        setPrePaidAmount(booking.depositAmount || 0);
+      }
+
+      if (booking.paymentMethod) {
+        setPaymentMethod(booking.paymentMethod as any);
+      }
+
       // Load billing items: Room stays + extra services from stay record
       const items: BillItem[] = [
         {
@@ -100,6 +115,22 @@ export default function CheckoutPayment() {
         });
       });
 
+      setBillItems(items);
+    } else {
+      // Fallback for cases where the original booking was deleted but the stay still exists
+      setStayPeriod(`${new Date(stay.actualCheckIn).toLocaleDateString('vi-VN')} đến Hiện tại`);
+      setPrePaidAmount(0);
+      
+      const items: BillItem[] = [];
+      stay.extraServices.forEach(svc => {
+        items.push({
+          id: svc.id,
+          description: svc.name,
+          unitPrice: svc.price,
+          quantity: svc.quantity,
+          amount: svc.amount
+        });
+      });
       setBillItems(items);
     }
     setShowStayDropdown(false);
@@ -140,7 +171,7 @@ export default function CheckoutPayment() {
     if (s.status !== 'STAYING') return false;
     const customer = customers.find(c => c.id === s.customerId);
     const room = db.getRoom(s.roomId);
-    
+
     const query = staySearchQuery.toLowerCase();
     return (
       (customer?.fullName.toLowerCase().includes(query) || false) ||
@@ -152,7 +183,7 @@ export default function CheckoutPayment() {
   // Calculate totals
   const subTotal = billItems.reduce((sum, item) => sum + item.amount, 0);
   const vatAmount = subTotal * 0.1;
-  const totalCharged = subTotal + vatAmount - discountVal;
+  const totalCharged = Math.max(0, subTotal + vatAmount - discountVal - prePaidAmount);
 
   const applyDiscount = () => {
     if (!discountCode.trim()) {
@@ -186,10 +217,10 @@ export default function CheckoutPayment() {
       return;
     }
 
-    if (paymentMethod === 'VNPAY') {
+    if (paymentMethod === 'VNPAY' && totalCharged > 0) {
       try {
         const toastId = toast.loading('Đang khởi tạo thanh toán VNPay...');
-        
+
         // Save checkout intent to sessionStorage so we can complete it after redirect
         sessionStorage.setItem('vnpay_checkout_intent', JSON.stringify({
           stayId: selectedStayId,
@@ -210,7 +241,7 @@ export default function CheckoutPayment() {
         });
 
         const data = await response.json();
-        
+
         if (data.redirectUrl) {
           toast.dismiss(toastId);
           window.location.href = data.redirectUrl; // Redirect to VNPAY Sandbox
@@ -237,7 +268,7 @@ export default function CheckoutPayment() {
 
   return (
     <div className="flex flex-col gap-6 text-stone-200 bg-[#0a0a0f]">
-      
+
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gold/15 pb-4">
         <div>
@@ -261,13 +292,13 @@ export default function CheckoutPayment() {
 
       {/* Main Grid Checkout Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
+
         {/* Form billing left (2/3 width) */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          
+
           {/* Metadata Section */}
           <div className="bg-[#111118] p-6 rounded-2xl border border-gold/10 shadow-md grid grid-cols-1 md:grid-cols-2 gap-4 relative">
-            
+
             {/* Invoice Code */}
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] uppercase tracking-wider text-[#9a9080] font-bold">Mã số hóa đơn (Auto-gen)</label>
@@ -405,7 +436,7 @@ export default function CheckoutPayment() {
                   {billItems.length > 0 ? (
                     billItems.map((item) => (
                       <tr key={item.id} className="border-b border-gold/10 hover:bg-[#1a1a24]/50 transition-colors">
-                        
+
                         {/* Description */}
                         <td className="py-3 pl-3">
                           <input
@@ -473,10 +504,10 @@ export default function CheckoutPayment() {
 
         {/* Right Panel Sticky "Tóm tắt thanh toán" */}
         <div className="flex flex-col gap-6 lg:sticky lg:top-4">
-          
+
           <div className="bg-[#111118] p-6 rounded-2xl border border-gold/10 shadow-md flex flex-col gap-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-stone-100">Tóm tắt thanh toán</h3>
-            
+
             <div className="flex flex-col gap-3.5 text-xs text-stone-400 font-medium">
               <div className="flex justify-between">
                 <span>Tiền dịch vụ & Phòng:</span>
@@ -486,7 +517,7 @@ export default function CheckoutPayment() {
                 <span>Thuế VAT (10%):</span>
                 <span>{vatAmount.toLocaleString('vi-VN')}đ</span>
               </div>
-              
+
               {/* Voucher apply */}
               <div className="flex flex-col gap-2 bg-[#07070a] p-3 rounded-lg border border-gold/10 mt-1">
                 <span className="text-[9px] uppercase tracking-wider font-bold text-[#9a9080]">Mã Voucher (Giảm giá)</span>
@@ -513,6 +544,13 @@ export default function CheckoutPayment() {
                   </p>
                 )}
               </div>
+
+              {prePaidAmount > 0 && (
+                <div className="flex justify-between items-center text-xs text-emerald-400 font-bold border-t border-gold/10 pt-3 mt-1 border-dashed">
+                  <span>Đã thanh toán trước/Đặt cọc:</span>
+                  <span>- {prePaidAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+              )}
             </div>
 
             {/* Total price inside gold border/bg banner */}

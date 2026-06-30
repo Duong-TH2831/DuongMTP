@@ -1,17 +1,37 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getDB, StayRecord, Booking, Customer, Room } from '@/lib/db';
 import { 
   Hotel, Search, AlertCircle, Plus, CheckCircle, 
-  Calendar, Users, User, ArrowRight, ClipboardList
+  Calendar, Users, User, ArrowRight, ClipboardList, Edit2, Trash2, X
 } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { toast } from 'sonner';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 export default function StayManagement() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const db = getDB();
   const rooms = db.getRooms();
   const roomTypes = db.getRoomTypes();
@@ -19,8 +39,22 @@ export default function StayManagement() {
 
   const [stays, setStays] = useState<StayRecord[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [tab, setTab] = useState<'ALL' | 'STAYING' | 'CHECKED_OUT' | 'PENDING_IN'>('ALL');
-  const [search, setSearch] = useState('');
+  
+  const initialTab = (searchParams.get('tab') as any) || 'ALL';
+  const initialSearch = searchParams.get('search') || '';
+  
+  const [tab, setTab] = useState<'ALL' | 'STAYING' | 'CHECKED_OUT' | 'PENDING_IN'>(initialTab);
+  const [search, setSearch] = useState(initialSearch);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [editingStayId, setEditingStayId] = useState('');
+  
+  const [formCustomerId, setFormCustomerId] = useState('');
+  const [formRoomId, setFormRoomId] = useState('');
+  const [formCheckIn, setFormCheckIn] = useState('');
+  const [formStatus, setFormStatus] = useState<'STAYING' | 'CHECKED_OUT'>('STAYING');
 
   useEffect(() => {
     setStays([...db.getStays()]);
@@ -43,14 +77,20 @@ export default function StayManagement() {
   };
 
   // Filter stays & bookings that are pending check-in
-  const pendingCheckInBookings = bookings.filter(b => b.status === 'CONFIRMED');
+  const pendingCheckInBookings = bookings.filter(b => {
+    if (b.status !== 'CONFIRMED') return false;
+    const cust = getCustomerInfo(b.customerId);
+    return cust.fullName.toLowerCase().includes(search.toLowerCase()) || 
+           cust.phone.includes(search);
+  });
 
   // Combined active list depending on selected Tab
   const filteredStays = stays.filter(s => {
     const cust = getCustomerInfo(s.customerId);
     const matchSearch = 
       cust.fullName.toLowerCase().includes(search.toLowerCase()) || 
-      s.stayCode.toLowerCase().includes(search.toLowerCase());
+      s.stayCode.toLowerCase().includes(search.toLowerCase()) ||
+      cust.phone.includes(search);
       
     if (tab === 'STAYING') {
       return s.status === 'STAYING' && matchSearch;
@@ -77,11 +117,140 @@ export default function StayManagement() {
     router.push(`/admin/payment?stayId=${stayId}`);
   };
 
+  const handleViewInvoice = (stayId: string) => {
+    const invoice = db.getInvoices().find(inv => inv.stayId === stayId);
+    if (invoice) {
+      router.push(`/admin/payment/${invoice.id}`);
+    } else {
+      router.push(`/admin/payment?stayId=${stayId}`);
+    }
+  };
+
+  const openAddModal = () => {
+    setModalMode('add');
+    setFormCustomerId('');
+    setFormRoomId('');
+    setFormCheckIn(new Date().toISOString().split('T')[0]);
+    setFormStatus('STAYING');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (stay: StayRecord) => {
+    setModalMode('edit');
+    setEditingStayId(stay.id);
+    setFormCustomerId(stay.customerId);
+    setFormRoomId(stay.roomId);
+    setFormCheckIn(new Date(stay.actualCheckIn).toISOString().split('T')[0]);
+    setFormStatus(stay.status as any);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteStay = (stayId: string) => {
+    if (confirm('Bạn có chắc chắn muốn xóa hồ sơ lưu trú này? Hành động này không thể hoàn tác.')) {
+      const success = db.deleteStay(stayId);
+      if (success) {
+        toast.success('Xóa hồ sơ lưu trú thành công!');
+        setStays([...db.getStays()]);
+      } else {
+        toast.error('Có lỗi xảy ra khi xóa!');
+      }
+    }
+  };
+
+  const handleSaveStay = () => {
+    if (!formCustomerId || !formRoomId || !formCheckIn) {
+      toast.error('Vui lòng điền đầy đủ các thông tin bắt buộc.');
+      return;
+    }
+    
+    if (modalMode === 'add') {
+      db.addStay({
+        bookingId: `walk-in-${Date.now()}`,
+        customerId: formCustomerId,
+        roomId: formRoomId,
+        actualCheckIn: new Date(formCheckIn).toISOString(),
+        status: formStatus,
+        staffId: 'usr-admin-1'
+      });
+      toast.success('Thêm hồ sơ lưu trú thành công!');
+    } else {
+      db.updateStay(editingStayId, {
+        customerId: formCustomerId,
+        roomId: formRoomId,
+        actualCheckIn: new Date(formCheckIn).toISOString(),
+        status: formStatus
+      });
+      toast.success('Cập nhật hồ sơ lưu trú thành công!');
+    }
+    setStays([...db.getStays()]);
+    setIsModalOpen(false);
+  };
+
   // Stats
   const checkInCount = pendingCheckInBookings.length;
   // Rooms needing checkout today
   const activeStays = stays.filter(s => s.status === 'STAYING');
   const checkOutCount = activeStays.length > 5 ? 5 : activeStays.length;
+
+  // Dynamic Chart Data Calculation
+  const chartLabels: string[] = [];
+  const occupiedData: number[] = [];
+  const availableData: number[] = [];
+
+  roomTypes.forEach(rt => {
+    const roomsOfType = rooms.filter(r => r.roomTypeId === rt.id);
+    const total = roomsOfType.length;
+    if (total === 0) return;
+    const occupied = roomsOfType.filter(r => r.status === 'OCCUPIED').length;
+    const available = total - occupied;
+
+    chartLabels.push(rt.name);
+    occupiedData.push(occupied);
+    availableData.push(available);
+  });
+
+  const chartData = {
+    labels: chartLabels,
+    datasets: [
+      {
+        label: 'Đang sử dụng',
+        data: occupiedData,
+        backgroundColor: 'rgba(234, 179, 8, 0.9)',
+        borderRadius: 4,
+      },
+      {
+        label: 'Phòng trống',
+        data: availableData,
+        backgroundColor: 'rgba(30, 41, 59, 0.8)',
+        borderRadius: 4,
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#a8a29e',
+          font: { family: 'Inter', size: 10, weight: 600 as const }
+        }
+      },
+    },
+    scales: {
+      x: {
+        stacked: true,
+        ticks: { color: '#a8a29e', font: { size: 10, weight: 600 as const } },
+        grid: { color: 'rgba(234, 179, 8, 0.05)' }
+      },
+      y: {
+        stacked: true,
+        ticks: { color: '#a8a29e', stepSize: 1, font: { size: 10 } },
+        grid: { color: 'rgba(234, 179, 8, 0.05)' }
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 text-stone-200 bg-[#0a0a0f]">
@@ -133,8 +302,8 @@ export default function StayManagement() {
       </div>
 
       {/* Tabs / Controls */}
-      <div className="bg-[#111118] p-4 rounded-xl border border-gold/10 shadow-md flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
+      <div className="bg-[#111118] p-4 rounded-xl border border-gold/10 shadow-md flex flex-col xl:flex-row gap-4 items-center justify-between">
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full xl:w-auto pb-1 xl:pb-0 scrollbar-hide">
           <button
             onClick={() => setTab('ALL')}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-all border cursor-pointer ${
@@ -177,15 +346,17 @@ export default function StayManagement() {
           </button>
         </div>
 
-        <div className="relative w-full md:max-w-xs shrink-0">
-          <Search className="w-4 h-4 text-stone-550 absolute left-3 top-1/2 transform -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Tìm mã lưu trú, khách..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-[#07070a] border border-gold/15 focus:border-gold/30 focus:bg-[#07070a] rounded-lg text-xs outline-none text-stone-200 transition-colors placeholder-stone-600"
-          />
+        <div className="flex items-center gap-3 w-full xl:w-auto">
+          <div className="relative w-full xl:max-w-xs shrink-0">
+            <Search className="w-4 h-4 text-stone-550 absolute left-3 top-1/2 transform -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Tìm mã lưu trú, khách..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-1.5 bg-[#07070a] border border-gold/15 focus:border-gold/30 focus:bg-[#07070a] rounded-lg text-xs outline-none text-stone-200 transition-colors placeholder-stone-600"
+            />
+          </div>
         </div>
       </div>
 
@@ -295,12 +466,27 @@ export default function StayManagement() {
                               </button>
                             ) : (
                               <button
-                                onClick={() => router.push(`/admin/payment?stayId=${s.id}`)}
+                                onClick={() => handleViewInvoice(s.id)}
                                 className="px-3 py-1 bg-[#07070a] border border-gold/5 hover:bg-[#1a1a24] text-stone-450 rounded text-[9px] font-semibold transition-colors cursor-pointer"
                               >
                                 Xem Hóa Đơn
                               </button>
                             )}
+                            
+                            <button
+                              onClick={() => openEditModal(s)}
+                              className="p-1 hover:bg-[#1a1a24] text-stone-400 hover:text-gold rounded transition-colors cursor-pointer"
+                              title="Sửa"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStay(s.id)}
+                              className="p-1 hover:bg-[#1a1a24] text-stone-400 hover:text-red-400 rounded transition-colors cursor-pointer"
+                              title="Xóa"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </td>
 
@@ -324,39 +510,8 @@ export default function StayManagement() {
         {/* Allocation widget (2/3 width) */}
         <div className="bg-[#111118] p-5 rounded-2xl border border-gold/10 shadow-md lg:col-span-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-stone-100 mb-4">Phân bổ phòng hôm nay</h3>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-3 bg-[#07070a] rounded-xl border border-gold/10">
-              <span className="text-[9px] text-[#9a9080] font-bold uppercase tracking-wider">Deluxe Suite</span>
-              <p className="text-lg font-bold text-stone-250 mt-1">42 / 60 phòng</p>
-              <div className="w-full bg-stone-800 h-1.5 rounded-full mt-2 relative overflow-hidden">
-                <div className="bg-blue-500 h-full rounded-full" style={{ width: '70%' }} />
-              </div>
-            </div>
-            
-            <div className="p-3 bg-[#07070a] rounded-xl border border-gold/10">
-              <span className="text-[9px] text-[#9a9080] font-bold uppercase tracking-wider">Ocean View</span>
-              <p className="text-lg font-bold text-stone-250 mt-1">16 / 24 phòng</p>
-              <div className="w-full bg-stone-800 h-1.5 rounded-full mt-2 relative overflow-hidden">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: '66%' }} />
-              </div>
-            </div>
-
-            <div className="p-3 bg-[#07070a] rounded-xl border border-gold/10">
-              <span className="text-[9px] text-[#9a9080] font-bold uppercase tracking-wider">Villa Suite</span>
-              <p className="text-lg font-bold text-stone-250 mt-1">4 / 6 phòng</p>
-              <div className="w-full bg-stone-800 h-1.5 rounded-full mt-2 relative overflow-hidden">
-                <div className="bg-emerald-500 h-full rounded-full" style={{ width: '66%' }} />
-              </div>
-            </div>
-
-            <div className="p-3 bg-[#07070a] rounded-xl border border-gold/10">
-              <span className="text-[9px] text-[#9a9080] font-bold uppercase tracking-wider">Penthouse</span>
-              <p className="text-lg font-bold text-stone-250 mt-1">1 / 2 phòng</p>
-              <div className="w-full bg-stone-800 h-1.5 rounded-full mt-2 relative overflow-hidden">
-                <div className="bg-rose-500 h-full rounded-full" style={{ width: '50%' }} />
-              </div>
-            </div>
+          <div className="h-48 w-full mt-2">
+            <Bar data={chartData} options={chartOptions} />
           </div>
         </div>
 
@@ -381,6 +536,88 @@ export default function StayManagement() {
 
       </div>
 
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#111118] border border-gold/20 w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-fade-in-up">
+            <div className="flex justify-between items-center p-4 border-b border-gold/10 bg-[#07070a]">
+              <h3 className="font-bold text-gold text-sm tracking-wide uppercase">
+                {modalMode === 'add' ? 'Thêm Mới Lưu Trú' : 'Chỉnh Sửa Lưu Trú'}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-stone-400 hover:text-white transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-5 flex flex-col gap-4 text-xs">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-stone-400 font-bold uppercase text-[10px] tracking-wider">Khách Hàng *</label>
+                <select
+                  value={formCustomerId}
+                  onChange={(e) => setFormCustomerId(e.target.value)}
+                  className="w-full bg-[#07070a] border border-gold/15 focus:border-gold/30 rounded-lg py-2 px-3 text-stone-200 outline-none cursor-pointer"
+                >
+                  <option value="" disabled>-- Chọn Khách Hàng --</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>{c.fullName} - {c.phone}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-stone-400 font-bold uppercase text-[10px] tracking-wider">Buồng Phòng *</label>
+                <select
+                  value={formRoomId}
+                  onChange={(e) => setFormRoomId(e.target.value)}
+                  className="w-full bg-[#07070a] border border-gold/15 focus:border-gold/30 rounded-lg py-2 px-3 text-stone-200 outline-none cursor-pointer"
+                >
+                  <option value="" disabled>-- Chọn Phòng --</option>
+                  {rooms.map(r => (
+                    <option key={r.id} value={r.id}>Phòng {r.roomNumber} - {r.status}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-stone-400 font-bold uppercase text-[10px] tracking-wider">Ngày Nhận Phòng *</label>
+                <input
+                  type="date"
+                  value={formCheckIn}
+                  onChange={(e) => setFormCheckIn(e.target.value)}
+                  className="w-full bg-[#07070a] border border-gold/15 focus:border-gold/30 rounded-lg py-2 px-3 text-stone-200 outline-none [color-scheme:dark]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-stone-400 font-bold uppercase text-[10px] tracking-wider">Trạng Thái *</label>
+                <select
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value as any)}
+                  className="w-full bg-[#07070a] border border-gold/15 focus:border-gold/30 rounded-lg py-2 px-3 text-stone-200 outline-none cursor-pointer"
+                >
+                  <option value="STAYING">Đang lưu trú</option>
+                  <option value="CHECKED_OUT">Đã trả phòng</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gold/10 bg-[#0a0a0f] flex justify-end gap-3">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-stone-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSaveStay}
+                className="px-4 py-2 text-xs font-bold bg-gold text-black rounded-lg hover:bg-gold-light transition-colors cursor-pointer"
+              >
+                Lưu Thay Đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

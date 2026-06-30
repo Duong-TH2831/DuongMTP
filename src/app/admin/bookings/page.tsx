@@ -2,15 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-  Calendar, Search, SlidersHorizontal, Plus, Check, 
-  ChevronLeft, ChevronRight, MessageSquare, AlertTriangle, Trash2
+import { useRouter } from 'next/navigation';
+import {
+  Calendar, Search, SlidersHorizontal, Plus, Check,
+  ChevronLeft, ChevronRight, MessageSquare, AlertTriangle, Trash2, LogIn, LogOut
 } from 'lucide-react';
 import { getDB, Booking, Customer, Room, RoomType } from '@/lib/db';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { toast } from 'sonner';
 
 export default function BookingList() {
+  const router = useRouter();
   const db = getDB();
   const roomTypes = db.getRoomTypes();
   const rooms = db.getRooms();
@@ -50,8 +52,8 @@ export default function BookingList() {
   const filtered = bookings.filter(b => {
     const cust = getCustomerInfo(b.customerId);
     const roomInfo = getRoomInfo(b.roomId);
-    
-    const matchSearch = 
+
+    const matchSearch =
       cust.fullName.toLowerCase().includes(search.toLowerCase()) ||
       cust.phone.includes(search) ||
       b.bookingCode.toLowerCase().includes(search.toLowerCase()) ||
@@ -106,6 +108,26 @@ export default function BookingList() {
     }
   };
 
+  const handleCheckIn = (bookingId: string) => {
+    const success = db.updateBookingStatus(bookingId, 'CHECKED_IN');
+    if (success) {
+      toast.success('Check-in thành công! Hồ sơ lưu trú đã tự động được tạo.');
+      setBookings([...db.getBookings()]);
+    } else {
+      toast.error('Lỗi khi Check-in.');
+    }
+  };
+
+  const handleCheckOut = (bookingId: string) => {
+    const stay = db.getStays().find(s => s.bookingId === bookingId);
+    if (stay) {
+      router.push(`/admin/payment?stayId=${stay.id}`);
+    } else {
+      toast.error('Không tìm thấy hồ sơ lưu trú tương ứng để trả phòng.');
+    }
+  };
+
+
   // Stats rows (preloaded totals as requested)
   const totalCount = 1284;
   const awaitingCount = bookings.filter(b => b.status === 'PENDING').length;
@@ -114,7 +136,7 @@ export default function BookingList() {
 
   return (
     <div className="flex flex-col gap-6 text-stone-200">
-      
+
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gold/15 pb-4">
         <div>
@@ -164,30 +186,27 @@ export default function BookingList() {
 
       {/* Search Bar & Tabs */}
       <div className="bg-[#111118] p-4 rounded-xl border border-gold/10 shadow-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
-        
+
         {/* Tab selection */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
           <button
             onClick={() => { setTab('ALL'); setCurrentPage(1); }}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer ${
-              tab === 'ALL' ? 'bg-gold text-black shadow-lg' : 'bg-[#07070a] border border-gold/10 hover:bg-[#1a1a24] text-stone-300'
-            }`}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer ${tab === 'ALL' ? 'bg-gold text-black shadow-lg' : 'bg-[#07070a] border border-gold/10 hover:bg-[#1a1a24] text-stone-300'
+              }`}
           >
             Tất cả phiếu
           </button>
           <button
             onClick={() => { setTab('TODAY'); setCurrentPage(1); }}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer ${
-              tab === 'TODAY' ? 'bg-gold text-black shadow-lg' : 'bg-[#07070a] border border-gold/10 hover:bg-[#1a1a24] text-stone-300'
-            }`}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer ${tab === 'TODAY' ? 'bg-gold text-black shadow-lg' : 'bg-[#07070a] border border-gold/10 hover:bg-[#1a1a24] text-stone-300'
+              }`}
           >
             Nhận phòng hôm nay
           </button>
           <button
             onClick={() => { setTab('PENDING'); setCurrentPage(1); }}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer ${
-              tab === 'PENDING' ? 'bg-gold text-black shadow-lg' : 'bg-[#07070a] border border-gold/10 hover:bg-[#1a1a24] text-stone-300'
-            }`}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition-colors cursor-pointer ${tab === 'PENDING' ? 'bg-gold text-black shadow-lg' : 'bg-[#07070a] border border-gold/10 hover:bg-[#1a1a24] text-stone-300'
+              }`}
           >
             Đang chờ duyệt ({awaitingCount})
           </button>
@@ -229,14 +248,40 @@ export default function BookingList() {
                   const room = getRoomInfo(b.roomId);
                   return (
                     <tr key={b.id} className="border-b border-gold/5 hover:bg-[#1a1a24]/50 transition-colors text-stone-300 font-medium">
-                      
+
                       {/* Booking Code */}
                       <td className="py-4 pl-4 font-mono font-bold text-stone-100">{b.bookingCode}</td>
-                      
+
                       {/* Guest Info */}
                       <td className="py-4">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-stone-200">{cust.fullName}</span>
+                        <div className="flex flex-col w-fit">
+                          {b.status === 'CONFIRMED' ? (
+                            <Link
+                              href={`/admin/stay?tab=PENDING_IN&search=${encodeURIComponent(cust.fullName)}`}
+                              className="font-bold text-stone-200 hover:text-gold hover:underline transition-colors"
+                              title="Xem trong danh sách Chờ Check-in"
+                            >
+                              {cust.fullName}
+                            </Link>
+                          ) : b.status === 'CHECKED_IN' ? (
+                            <Link
+                              href={`/admin/stay?tab=STAYING&search=${encodeURIComponent(cust.fullName)}`}
+                              className="font-bold text-stone-200 hover:text-gold hover:underline transition-colors"
+                              title="Xem trong danh sách Đang ở"
+                            >
+                              {cust.fullName}
+                            </Link>
+                          ) : b.status === 'CHECKED_OUT' ? (
+                            <Link
+                              href={`/admin/stay?tab=CHECKED_OUT&search=${encodeURIComponent(cust.fullName)}`}
+                              className="font-bold text-stone-200 hover:text-gold hover:underline transition-colors"
+                              title="Xem trong danh sách Đã trả phòng"
+                            >
+                              {cust.fullName}
+                            </Link>
+                          ) : (
+                            <span className="font-bold text-stone-200">{cust.fullName}</span>
+                          )}
                           <span className="text-[10px] text-[#9a9080] font-mono mt-0.5">{cust.phone}</span>
                         </div>
                       </td>
@@ -288,6 +333,26 @@ export default function BookingList() {
                             >
                               <Check className="w-3.5 h-3.5" />
                               Duyệt
+                            </button>
+                          )}
+                          {b.status === 'CONFIRMED' && (
+                            <button
+                              onClick={() => handleCheckIn(b.id)}
+                              className="px-2.5 py-1 bg-blue-950/40 hover:bg-blue-900/50 text-blue-400 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
+                              title="Làm thủ tục nhận phòng"
+                            >
+                              <LogIn className="w-3.5 h-3.5" />
+                              Check-in
+                            </button>
+                          )}
+                          {b.status === 'CHECKED_IN' && (
+                            <button
+                              onClick={() => handleCheckOut(b.id)}
+                              className="px-2.5 py-1 bg-amber-950/40 hover:bg-amber-900/50 text-amber-400 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all"
+                              title="Làm thủ tục trả phòng"
+                            >
+                              <LogOut className="w-3.5 h-3.5" />
+                              Check-out
                             </button>
                           )}
                           {b.status !== 'CANCELLED' && b.status !== 'CHECKED_OUT' && (
@@ -368,7 +433,7 @@ export default function BookingList() {
 
       {/* Bottom widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
-        
+
         {/* Occupancy Peak Notice */}
         <div className="bg-amber-950/20 text-stone-250 border border-amber-500/20 p-6 rounded-2xl flex gap-4">
           <AlertTriangle className="w-6 h-6 text-amber-555 shrink-0 mt-0.5" />

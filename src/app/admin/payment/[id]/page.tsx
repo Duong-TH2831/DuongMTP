@@ -25,7 +25,7 @@ export default function InvoiceDetail() {
         setInvoice(inv);
         const cust = db.getCustomer(inv.customerId);
         if (cust) setCustomer(cust);
-        
+
         const st = db.getStay(inv.stayId);
         if (st) {
           setStay(st);
@@ -46,13 +46,13 @@ export default function InvoiceDetail() {
   // Helper to convert number to words in Vietnamese (simplified for resort price ranges)
   const numberToWords = (num: number): string => {
     if (num <= 0) return 'Không đồng chẵn';
-    
+
     const units = ['', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
-    
+
     if (num >= 1000000 && num < 100000000) {
       const millions = Math.floor(num / 1000000);
       const thousands = Math.floor((num % 1000000) / 1000);
-      
+
       let str = `${units[Math.floor(millions / 10)] ? units[Math.floor(millions / 10)] + ' mươi ' : ''}${units[millions % 10] ? units[millions % 10] : ''} triệu`;
       if (thousands > 0) {
         str += ` ${thousands} nghìn`;
@@ -60,7 +60,7 @@ export default function InvoiceDetail() {
       str += ' đồng chẵn';
       return str.charAt(0).toUpperCase() + str.slice(1).replace(/\s+/g, ' ');
     }
-    
+
     return `${num.toLocaleString('vi-VN')} đồng chẵn`;
   };
 
@@ -90,7 +90,7 @@ export default function InvoiceDetail() {
 
   return (
     <div className="flex flex-col gap-6 text-stone-200 bg-[#0a0a0f] print:bg-white print:text-black print:p-0">
-      
+
       {/* Breadcrumbs (Hidden in print) */}
       <div className="flex items-center gap-2 text-xs font-semibold text-stone-500 print:hidden">
         <Link href="/admin" className="hover:text-gold transition-colors">Dashboard</Link>
@@ -134,7 +134,7 @@ export default function InvoiceDetail() {
 
       {/* A4 PRINT VIEW PAGE CONTAINER */}
       <div className="bg-[#111118] p-8 md:p-12 rounded-2xl border border-gold/10 shadow-2xl text-stone-200 max-w-4xl mx-auto w-full print:bg-white print:text-black print:border-none print:shadow-none print:p-0 print:mx-0">
-        
+
         {/* Invoice Letterhead */}
         <div className="flex flex-col md:flex-row justify-between items-start border-b border-gold/15 pb-8 mb-8 gap-6 print:border-black print:pb-4 print:mb-4">
           <div className="flex flex-col gap-1.5">
@@ -149,7 +149,10 @@ export default function InvoiceDetail() {
             <div className="text-xs text-stone-400 flex flex-col gap-0.5 font-medium print:text-black/80">
               <p>Mã hóa đơn: <strong className="text-gold font-mono font-extrabold print:text-black">{invoice.invoiceCode}</strong></p>
               <p>Ngày lập: {new Date(invoice.issueDate).toLocaleDateString('vi-VN')}</p>
-              <p>Hình thức: {invoice.paymentMethod === 'TRANSFER' ? 'Chuyển khoản' : (invoice.paymentMethod === 'CARD' ? 'Thẻ tín dụng' : 'Tiền mặt')}</p>
+              <p>Hình thức: {
+                invoice.paymentMethod === 'VNPAY' ? <strong className="text-blue-400 font-bold">Cổng thanh toán VNPay</strong> :
+                (invoice.paymentMethod === 'TRANSFER' ? 'Chuyển khoản' : (invoice.paymentMethod === 'CARD' ? 'Thẻ tín dụng' : 'Tiền mặt'))
+              }</p>
               <p className="text-emerald-450 font-bold uppercase tracking-wider mt-1 text-[10px] print:text-emerald-600">Tình trạng: ĐÃ THANH TOÁN</p>
             </div>
           </div>
@@ -157,7 +160,7 @@ export default function InvoiceDetail() {
 
         {/* Guest & Room Details Grid (2 columns) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 text-xs font-semibold print:mb-6 print:gap-4">
-          
+
           {/* Guest Info */}
           <div className="bg-[#07070a]/50 p-4 rounded-xl border border-gold/10 flex flex-col gap-2 print:bg-white print:border-black/25 print:text-black">
             <h3 className="text-[10px] uppercase tracking-wider text-[#9a9080] font-bold print:text-black/55">Thông tin khách hàng</h3>
@@ -211,7 +214,7 @@ export default function InvoiceDetail() {
 
         {/* Billing details calculation with Mock QR Code */}
         <div className="flex flex-col md:flex-row justify-between items-start gap-8 border-b border-gold/15 pb-8 mb-8 print:border-black print:pb-4 print:mb-4">
-          
+
           {/* QR Code and Written words (Left) */}
           <div className="flex-1 flex flex-col md:flex-row gap-6 items-center md:items-start text-xs font-semibold print:gap-4">
             {/* Mock QR Code */}
@@ -220,7 +223,7 @@ export default function InvoiceDetail() {
                 <div className="w-full h-full bg-gold/80 border-2 border-black/80 print:bg-black" style={{ clipPath: 'polygon(0% 0%, 50% 0%, 50% 50%, 100% 50%, 100% 100%, 0% 100%)' }} />
               </div>
             </div>
-            
+
             <div className="flex flex-col gap-2 text-center md:text-left">
               <p className="text-[10px] text-[#9a9080] uppercase tracking-wider font-bold print:text-black/60">Mã tra cứu e-invoice</p>
               <p className="font-mono font-bold text-stone-300 print:text-black">{invoice.id.slice(0, 16)}</p>
@@ -246,6 +249,12 @@ export default function InvoiceDetail() {
                 <span className="font-bold font-mono">-{invoice.discount.toLocaleString('vi-VN')}đ</span>
               </div>
             )}
+            {invoice.prePaidAmount && invoice.prePaidAmount > 0 ? (
+              <div className="flex justify-between text-emerald-450 print:text-emerald-700 mt-1">
+                <span>Đã thanh toán trước {booking.paymentMethod === 'VNPAY' ? '(qua VNPay)' : ''}:</span>
+                <span className="font-bold font-mono">-{invoice.prePaidAmount.toLocaleString('vi-VN')}đ</span>
+              </div>
+            ) : null}
             <div className="h-[1px] bg-gold/15 my-2 print:bg-black" />
             <div className="flex justify-between items-center text-sm font-bold text-gold print:text-black">
               <span>TỔNG CỘNG (TOTAL):</span>
@@ -255,8 +264,8 @@ export default function InvoiceDetail() {
 
         </div>
 
-        {/* Double-column Signatures */}
-        <div className="grid grid-cols-2 text-center text-xs font-bold text-stone-400 pt-6 pb-12 mb-6 print:text-black print:pb-6 print:mb-4">
+        {/* Triple-column Signatures */}
+        <div className="grid grid-cols-3 text-center text-xs font-bold text-stone-400 pt-6 pb-12 mb-6 print:text-black print:pb-6 print:mb-4">
           <div className="flex flex-col gap-1.5">
             <p className="uppercase tracking-wider text-stone-300 print:text-black">Khách Hàng Ký Nhận</p>
             <p className="text-[9px] text-stone-500 font-normal italic print:text-black/60">(Ký và ghi rõ họ tên / Guest Signature)</p>
@@ -268,7 +277,20 @@ export default function InvoiceDetail() {
             <p className="uppercase tracking-wider text-stone-300 print:text-black">Nhân Viên Thu Ngân</p>
             <p className="text-[9px] text-stone-500 font-normal italic print:text-black/60">(Ký và đóng dấu xác nhận / Cashier)</p>
             <div className="h-16 print:h-12" />
-            <p className="text-stone-200 font-bold print:text-black">Nguyễn Minh Trí</p>
+            <p className="text-stone-200 font-bold print:text-black">Dương Đình Mạnh</p>
+          </div>
+
+          <div className="flex flex-col gap-1.5 relative">
+            <p className="uppercase tracking-wider text-stone-300 print:text-black">Chủ Khách Sạn</p>
+            <p className="text-[9px] text-stone-500 font-normal italic print:text-black/60">(Ký và đóng dấu / Owner)</p>
+            <div className="h-16 print:h-12 flex items-center justify-center relative mt-1">
+              <img
+                src="/chuki.png"
+                alt="Chữ ký Dương"
+                className="signature-img h-28 object-contain -mt-6 opacity-90"
+              />
+            </div>
+            <p className="text-stone-200 font-bold print:text-black mt-2">Đỗ Hồng Dương</p>
           </div>
         </div>
 

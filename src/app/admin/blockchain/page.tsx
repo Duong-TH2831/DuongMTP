@@ -26,9 +26,14 @@ export default function BlockchainTransactions() {
   }, []);
 
   const filteredBlocks = blocks.filter(b => {
-    const matchSearch = b.hash.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        b.previousHash.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        (b.transactions.length > 0 && b.transactions[0].invoiceCode.toLowerCase().includes(searchTerm.toLowerCase()));
+    const cleanSearchTerm = searchTerm.trim().toLowerCase();
+    const matchSearch = cleanSearchTerm === '' || 
+                        b.hash.toLowerCase().includes(cleanSearchTerm) ||
+                        b.previousHash.toLowerCase().includes(cleanSearchTerm) ||
+                        (b.transactions.length > 0 && (
+                          b.transactions[0].invoiceCode.toLowerCase().includes(cleanSearchTerm) ||
+                          (b.transactions[0].txHash && b.transactions[0].txHash.toLowerCase().includes(cleanSearchTerm))
+                        ));
                         
     const matchPayment = paymentMethodFilter === 'ALL' || 
                          (b.transactions.length > 0 && b.transactions[0].paymentMethod === paymentMethodFilter);
@@ -225,7 +230,10 @@ export default function BlockchainTransactions() {
                       <td className="py-4 font-mono font-bold text-stone-300">
                         {tx ? (
                           <div className="flex flex-col gap-1.5">
-                            <Link href={`/admin/payment/${tx.invoiceId}`} className="hover:text-gold transition-colors flex items-center gap-1 group/link w-fit">
+                            <Link 
+                              href={tx.invoiceCode.startsWith('INV-') ? `/admin/payment/${tx.invoiceId}` : `/admin/bookings`} 
+                              className="hover:text-gold transition-colors flex items-center gap-1 group/link w-fit"
+                            >
                               {tx.invoiceCode} <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover/link:opacity-100 transition-opacity -ml-1 text-gold" />
                             </Link>
                             <span className={`w-fit px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border shadow-sm ${
@@ -247,7 +255,16 @@ export default function BlockchainTransactions() {
 
                       {/* Value */}
                       <td className="py-4 text-right font-mono font-bold text-stone-200">
-                        {tx ? `${tx.amount.toLocaleString('vi-VN')}đ` : '-'}
+                        {tx ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <span>{tx.amount > 0 ? `${tx.amount.toLocaleString('vi-VN')}đ` : '0đ'}</span>
+                            {tx.amount === 0 && tx.invoiceCode.startsWith('INV-') && (
+                              <span className="text-[9px] text-emerald-400 uppercase tracking-wider font-sans bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-500/20" title="Khách đã thanh toán đủ tiền từ lúc đặt phòng">
+                                Paid in Advance
+                              </span>
+                            )}
+                          </div>
+                        ) : '-'}
                       </td>
 
                       {/* Time */}

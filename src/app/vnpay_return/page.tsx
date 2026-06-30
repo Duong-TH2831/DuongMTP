@@ -37,27 +37,15 @@ function PublicVNPayReturnContent() {
               const idx = db.getBookings().findIndex(b => b.id === targetBooking.id);
               if (idx !== -1) {
                 db.getBookings()[idx].paymentStatus = 'PAID';
-                
                 // Add Blockchain Transaction for this Booking payment
-                let hash = 0;
-                const str = targetBooking.id + new Date().toISOString() + "HorizonHMS";
-                for (let i = 0; i < str.length; i++) {
-                  hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                  hash = hash & hash;
-                }
-                const hex = Math.abs(hash).toString(16);
-                const txHash = `0x${hex}000000000000000000000000000000000000000000000000`.slice(0, 42);
-                
                 db.addBlockchainTransaction({
                   id: `tx-${Date.now()}`,
-                  txHash,
                   invoiceId: targetBooking.id, // Using booking ID
                   invoiceCode: targetBooking.bookingCode, // Using booking code
                   paymentMethod: 'VNPAY',
                   amount: targetBooking.totalPrice,
                   timestamp: new Date().toISOString(),
-                  status: 'Confirmed',
-                  blockNumber: 120000 + db.getBlockchainTransactions().length + 1
+                  status: 'Confirmed'
                 });
                 
                 db.save();
